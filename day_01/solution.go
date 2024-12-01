@@ -67,6 +67,47 @@ func Part1(input *[]string) (int, error) {
 	return totalDistance, nil
 }
 
-func Part2(input []string) (int, error) {
-	return -1, fmt.Errorf("Not implemented yet")
+func calculateOccurrences(secondList *[]int) map[int]int {
+	occurrencesMap := make(map[int]int)
+
+	for _, el := range *secondList {
+		sum, exists := occurrencesMap[el]
+
+		if exists {
+			occurrencesMap[el] = sum + 1
+		} else {
+			occurrencesMap[el] = 1
+		}
+	}
+
+	return occurrencesMap
+}
+
+func Part2(input *[]string) (int, error) {
+	data, err := parseInput(input)
+
+	if err != nil {
+		return -1, err
+	}
+
+	column_1 := data[0]
+	column_2 := data[1]
+
+	occurrencesMap := calculateOccurrences(&column_2)
+
+	sum := 0
+
+	for _, value := range column_1 {
+		occurrences, hasAnyOccurrences := occurrencesMap[value]
+
+		multiplied := 0
+
+		if hasAnyOccurrences {
+			multiplied = value * occurrences
+		}
+
+		sum += multiplied
+	}
+
+	return sum, nil
 }
