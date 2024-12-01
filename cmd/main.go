@@ -1,6 +1,7 @@
 package main
 
 import (
+	"aoc2024/day_01"
 	"bufio"
 	"fmt"
 	"os"
@@ -72,6 +73,19 @@ func readInputFile(challenge ChallengeId) ([]string, error) {
 	return lines, nil
 }
 
+func runChallange(challengeId ChallengeId, puzzleInput *[]string) (int, error) {
+	switch challengeId.Day {
+	case 1:
+		if challengeId.Part == 1 {
+			return day_01.Part1(puzzleInput)
+		} else {
+			return -1, fmt.Errorf("Not implemented yet")
+		}
+	default:
+		return -1, fmt.Errorf("Not implemented yet")
+	}
+}
+
 func main() {
 
 	challengeId, err := getDayAndPartFromArgs()
@@ -94,8 +108,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	for _, line := range puzzleInput {
-		fmt.Println(line)
+	result, err := runChallange(challengeId, &puzzleInput)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "An error occurred when solving the puzzle:", err)
+		os.Exit(1)
 	}
 
+	fmt.Println(fmt.Sprintf("Result: %d", result))
+
+	os.Exit(0)
 }
