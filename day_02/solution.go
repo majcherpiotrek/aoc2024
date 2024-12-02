@@ -53,26 +53,19 @@ func checkIsStepSafe(step int, isIncreasing bool) bool {
 }
 
 func isReportSafe(report *[]int) bool {
-	isSafe := true
+	isSafe := len(*report) > 1
 	var isIncreasing bool
 
 	reportLength := len(*report)
 
-	if reportLength > 1 {
-		for i := 1; i < reportLength && isSafe; i++ {
-			step := (*report)[i] - (*report)[i-1]
+	for i := 1; i < reportLength && isSafe; i++ {
+		step := (*report)[i] - (*report)[i-1]
 
-			if step == 0 {
-				isSafe = false
-			} else {
-				if i == 1 {
-					isIncreasing = step > 0
-				}
-
-				isSafe = checkIsStepSafe(step, isIncreasing)
-			}
+		if i == 1 {
+			isIncreasing = step > 0
 		}
 
+		isSafe = checkIsStepSafe(step, isIncreasing)
 	}
 
 	return isSafe
@@ -97,7 +90,44 @@ func Part1(input *[]string) (int, error) {
 	return numOfSafeReports, nil
 }
 
-func Part2(input *[]string) (int, error) {
+func splitPossibilities(report *[]int) [][]int {
+	reportLength := len(*report)
+	possibilities := make([][]int, 0, reportLength)
 
-	return -1, fmt.Errorf("not implemented")
+	for i := 0; i < reportLength; i++ {
+		start := append([]int{}, (*report)[0:i]...)
+		end := append([]int{}, (*report)[i+1:]...)
+		combined := append(start, end...)
+		possibilities = append(possibilities, combined)
+	}
+
+	return possibilities
+}
+
+func Part2(input *[]string) (int, error) {
+	data, err := parseInput(input)
+
+	if err != nil {
+		return -1, err
+	}
+
+	numOfSafeReports := 0
+
+	for _, report := range data {
+		if isReportSafe(&report) {
+			numOfSafeReports += 1
+		} else {
+			otherPossibilities := splitPossibilities(&report)
+			for _, sub := range otherPossibilities {
+				if isReportSafe(&sub) {
+					numOfSafeReports += 1
+					break
+				}
+
+			}
+		}
+
+	}
+
+	return numOfSafeReports, nil
 }
