@@ -87,7 +87,7 @@ func runChallange(challengeId ChallengeId, puzzleInput *[]string) (int, error) {
 		if challengeId.Part == 1 {
 			return day_02.Part1(puzzleInput)
 		} else {
-			return -1, fmt.Errorf("not implemented")
+			return day_02.Part2(puzzleInput)
 		}
 	default:
 		return -1, fmt.Errorf("Not implemented yet")
