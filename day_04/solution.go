@@ -113,7 +113,38 @@ func Part1(rows *[]string) (int, error) {
 	return count, nil
 }
 
-func Part2(input *[]string) (int, error) {
+const MAS = "MAS"
 
-	return -1, fmt.Errorf("not implemented")
+func isXMas(rect []string) bool {
+	principalDiagonalBytes := append([]byte{}, rect[0][0], rect[1][1], rect[2][2])
+	principalDiagonal := string(principalDiagonalBytes)
+	principalDiagonalReversed := reverseString(principalDiagonal)
+
+	counterDiagonalBytes := append([]byte{}, rect[0][2], rect[1][1], rect[2][0])
+	counterDiagonal := string(counterDiagonalBytes)
+	counterDiagonalReversed := reverseString(counterDiagonal)
+
+	return (principalDiagonal == MAS || principalDiagonalReversed == MAS) &&
+		(counterDiagonal == MAS || counterDiagonalReversed == MAS)
+}
+
+func Part2(input *[]string) (int, error) {
+	width := len((*input)[0])
+	height := len(*input)
+
+	sum := 0
+	for x := 1; x < width-1; x++ {
+		for y := 1; y < height-1; y++ {
+			rect := make([]string, 3)
+			rect[0] = (*input)[y-1][x-1 : x+2]
+			rect[1] = (*input)[y][x-1 : x+2]
+			rect[2] = (*input)[y+1][x-1 : x+2]
+
+			if isXMas(rect) {
+				sum += 1
+			}
+		}
+	}
+
+	return sum, nil
 }
