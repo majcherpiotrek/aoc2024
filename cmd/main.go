@@ -5,6 +5,8 @@ import (
 	"aoc2024/day_02"
 	"aoc2024/day_03"
 	"aoc2024/day_04"
+	"aoc2024/day_05"
+	"aoc2024/day_06"
 	"bufio"
 	"fmt"
 	"os"
@@ -102,6 +104,18 @@ func runChallange(challengeId ChallengeId, puzzleInput *[]string) (int, error) {
 			return day_04.Part1(puzzleInput)
 		} else {
 			return day_04.Part2(puzzleInput)
+		}
+	case 5:
+		if challengeId.Part == 1 {
+			return day_05.Part1(puzzleInput)
+		} else {
+			return day_05.Part2(puzzleInput)
+		}
+	case 6:
+		if challengeId.Part == 1 {
+			return day_06.Part1(puzzleInput)
+		} else {
+			return day_06.Part2(puzzleInput)
 		}
 	default:
 		return -1, fmt.Errorf("Not implemented yet")
