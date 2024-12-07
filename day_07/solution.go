@@ -190,11 +190,9 @@ func checkIsValid(equation CalibrationEquation) bool {
 		return true
 	}
 
-	if len(equation.Numbers) > 2 {
-		isValid := checkIsValid(CalibrationEquation{TestValue: equation.TestValue, Numbers: newNumbers})
-		if isValid {
-			return true
-		}
+	isValid := checkIsValid(CalibrationEquation{TestValue: equation.TestValue, Numbers: newNumbers})
+	if isValid {
+		return true
 	}
 
 	// Try to multiply
@@ -204,11 +202,9 @@ func checkIsValid(equation CalibrationEquation) bool {
 	if sum == equation.TestValue && len(rest) == 0 {
 		return true
 	}
-	if len(equation.Numbers) > 2 {
-		isValid := checkIsValid(CalibrationEquation{TestValue: equation.TestValue, Numbers: newNumbers})
-		if isValid {
-			return true
-		}
+	isValid = checkIsValid(CalibrationEquation{TestValue: equation.TestValue, Numbers: newNumbers})
+	if isValid {
+		return true
 	}
 
 	// Try to concat
@@ -225,15 +221,7 @@ func checkIsValid(equation CalibrationEquation) bool {
 		return true
 	}
 
-	if len(equation.Numbers) > 2 {
-		isValid := checkIsValid(CalibrationEquation{TestValue: equation.TestValue, Numbers: newNumbers})
-		if isValid {
-			return true
-		}
-	}
-
-	return false
-
+	return checkIsValid(CalibrationEquation{TestValue: equation.TestValue, Numbers: newNumbers})
 }
 
 func Part2(rows *[]string) (int, error) {
@@ -246,9 +234,7 @@ func Part2(rows *[]string) (int, error) {
 	sumOfValidTestValues := 0
 
 	for _, equation := range equations {
-		isValid := checkIsValid(equation)
-
-		if isValid {
+		if checkIsValid(equation) {
 			sumOfValidTestValues += equation.TestValue
 		}
 
