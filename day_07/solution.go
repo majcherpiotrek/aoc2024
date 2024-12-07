@@ -12,6 +12,7 @@ type Operation int
 const (
 	Add = iota
 	Mul
+	Concat
 )
 
 type CalibrationEquation struct {
@@ -37,7 +38,7 @@ func parseInput(rows *[]string) ([]CalibrationEquation, error) {
 
 		split = strings.Fields(split[1])
 
-		numbers := make([]int, len(split))
+		numbers := make([]int, 0, len(split))
 
 		for _, numStr := range split {
 			num, err := strconv.Atoi(numStr)
@@ -56,33 +57,26 @@ func parseInput(rows *[]string) ([]CalibrationEquation, error) {
 }
 
 func generatePossibilities(n int) [][]Operation {
-	// fmt.Printf("Generating possibilities for %d\n", n)
 	if n == 0 {
 		return make([][]Operation, 0)
 	}
 
 	max := int(math.Pow(2, float64(n)))
-	// fmt.Printf("Max: %d\n", max)
 
 	var allOperations [][]Operation
 
 	for i := 0; i < max; i++ {
 		var operations []Operation
 		binary := fmt.Sprintf("%0*b", n, i)
-		// fmt.Printf("Binary: %s\n", binary)
 
 		for _, str := range binary {
-			// fmt.Printf("str %c ", str)
 			b, err := strconv.Atoi(string(str))
-			// fmt.Printf("b %d\n", b)
 			if err != nil {
 				panic("test")
 			}
 			op := Operation(b)
-			// fmt.Printf("Operation %d from byte %d\n", op, b)
 			operations = append(operations, op)
 		}
-		// fmt.Printf("Operations: %v\n", operations)
 
 		allOperations = append(allOperations, operations)
 	}
@@ -167,7 +161,99 @@ func Part1(rows *[]string) (int, error) {
 	return sumOfValidTestValues, nil
 }
 
+func checkIsValid(equation CalibrationEquation) bool {
+	if len(equation.Numbers) == 0 {
+		return false
+	}
+
+	if len(equation.Numbers) == 1 {
+		if equation.TestValue == equation.Numbers[0] {
+			return true
+		}
+		return false
+	}
+
+	if equation.Numbers[0] > equation.TestValue {
+		return false
+	}
+
+	a := equation.Numbers[0]
+	b := equation.Numbers[1]
+	rest := equation.Numbers[2:]
+
+	// Try to add
+	sum := a + b
+	newNumbers := []int{sum}
+	newNumbers = append(newNumbers, rest...)
+
+	if sum == equation.TestValue && len(rest) == 0 {
+		return true
+	}
+
+	if len(equation.Numbers) > 2 {
+		isValid := checkIsValid(CalibrationEquation{TestValue: equation.TestValue, Numbers: newNumbers})
+		if isValid {
+			return true
+		}
+	}
+
+	// Try to multiply
+	sum = a * b
+	newNumbers = []int{sum}
+	newNumbers = append(newNumbers, rest...)
+	if sum == equation.TestValue && len(rest) == 0 {
+		return true
+	}
+	if len(equation.Numbers) > 2 {
+		isValid := checkIsValid(CalibrationEquation{TestValue: equation.TestValue, Numbers: newNumbers})
+		if isValid {
+			return true
+		}
+	}
+
+	// Try to concat
+	sumStr := fmt.Sprintf("%d%d", a, b)
+	sum, err := strconv.Atoi(sumStr)
+
+	if err != nil {
+		panic("Unexpected error")
+	}
+
+	newNumbers = []int{sum}
+	newNumbers = append(newNumbers, rest...)
+	if sum == equation.TestValue && len(rest) == 0 {
+		return true
+	}
+
+	if len(equation.Numbers) > 2 {
+		isValid := checkIsValid(CalibrationEquation{TestValue: equation.TestValue, Numbers: newNumbers})
+		if isValid {
+			return true
+		}
+	}
+
+	return false
+
+}
+
 func Part2(rows *[]string) (int, error) {
-	return -1, fmt.Errorf("not implemented")
+	equations, err := parseInput(rows)
+
+	if err != nil {
+		return -1, err
+	}
+
+	sumOfValidTestValues := 0
+
+	for _, equation := range equations {
+		isValid := checkIsValid(equation)
+
+		if isValid {
+			sumOfValidTestValues += equation.TestValue
+		}
+
+	}
+
+	return sumOfValidTestValues, nil
 
 }
