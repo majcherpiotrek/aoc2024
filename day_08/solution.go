@@ -2,6 +2,7 @@ package day_08
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -63,7 +64,42 @@ func findAntinodesForPoints(a []int, b []int, xMax int, yMax int) [][]int {
 	}
 
 	return nodes
+}
 
+func findAntinodesForPointsPart2(a []int, b []int, xMax int, yMax int) [][]int {
+	var nodes [][]int
+
+	vect := minimizeVector(getVector(a, b))
+	fmt.Printf("vect AB %v", vect)
+
+	for node := addVector(a, vect); isInBounds(node, xMax, yMax); node = addVector(node, vect) {
+		nodes = append(nodes, node)
+	}
+
+	vect = minimizeVector(getVector(b, a))
+	fmt.Printf("vect BA %v", vect)
+
+	for node := addVector(b, vect); isInBounds(node, xMax, yMax); node = addVector(node, vect) {
+		nodes = append(nodes, node)
+	}
+
+	return nodes
+
+}
+
+func gcd(a int, b int) int {
+	if a == 0 {
+		return int(math.Abs(float64(b)))
+	}
+
+	return gcd(b%a, a)
+}
+
+func minimizeVector(vect []int) []int {
+	divisor := gcd(vect[0], vect[1])
+	fmt.Printf("GCD %d, %d = %d", vect[0], vect[1], divisor)
+
+	return []int{vect[0] / divisor, vect[1] / divisor}
 }
 
 func encodePoint(a []int) string {
@@ -104,7 +140,6 @@ func Part1(rows *[]string) (int, error) {
 	antennasMap := findAntennas(rows)
 	uniqueAntinodes := make(map[string]struct{})
 
-	//fmt.Println(antennas)
 	for key, antennas := range antennasMap {
 		fmt.Printf("Analyzing antennas '%c'\n", key)
 		fmt.Printf("Locations: %v\n", antennas)
@@ -125,6 +160,45 @@ func Part1(rows *[]string) (int, error) {
 }
 
 func Part2(rows *[]string) (int, error) {
+	width := len((*rows)[0])
+	height := len(*rows)
+	antennasMap := findAntennas(rows)
+	uniqueAntinodes := make(map[string]struct{})
 
-	return -1, fmt.Errorf("Not implemented")
+	for key, antennas := range antennasMap {
+		fmt.Printf("Analyzing antennas '%c'\n", key)
+		fmt.Printf("Locations: %v\n", antennas)
+
+		allPairs := allAntennaPairs(antennas)
+		fmt.Printf("all pairs: %v\n", allPairs)
+
+		for _, pair := range allPairs {
+			fmt.Printf("Pair: %v\n", pair)
+			antinodes := findAntinodesForPointsPart2(pair[0], pair[1], width-1, height-1)
+			fmt.Printf("Antinodes: %v\n", antinodes)
+
+			for _, node := range antinodes {
+				encoded := encodePoint(node)
+				uniqueAntinodes[encoded] = struct{}{}
+			}
+		}
+	}
+
+	matrix := make([][]byte, 0, len(*rows))
+
+	for _, row := range *rows {
+		bytes := []byte(row)
+		matrix = append(matrix, bytes)
+	}
+
+	for key := range uniqueAntinodes {
+		decoded := decodePoint(key)
+		matrix[decoded[1]][decoded[0]] = '#'
+	}
+
+	for _, row := range matrix {
+		fmt.Printf("%s\n", string(row))
+	}
+
+	return len(uniqueAntinodes), nil
 }
