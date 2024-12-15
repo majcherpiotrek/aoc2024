@@ -2,9 +2,14 @@ package day_14
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 )
+
+const WIDTH int = 101
+const HEIGHT int = 103
 
 type Robot struct {
 	Position []int
@@ -14,7 +19,6 @@ type Robot struct {
 func (r *Robot) move(mapWidth int, mapHeight int) {
 	nextPosition := addVectors(r.Position, r.Velocity)
 
-	//fmt.Printf("Moving robot: (%d, %d) -> (%d, %d) = (%d, %d)", r.Position[0], r.Position[1], r.Velocity[0], r.Velocity[1], nextPosition[0], nextPosition[1])
 	x := nextPosition[0]
 
 	if x >= mapWidth {
@@ -34,7 +38,6 @@ func (r *Robot) move(mapWidth int, mapHeight int) {
 	if y < 0 {
 		y = mapHeight + y
 	}
-	//fmt.Printf(", actually (%d, %d)\n", x, y)
 
 	r.Position = []int{x, y}
 }
@@ -133,12 +136,12 @@ func sumRobots(matrix [][]int) []int {
 	return []int{sumQ1, sumQ2, sumQ3, sumQ4}
 }
 
-func printRobots(robots *[]*Robot) [][]int {
-	matrix := make([][]int, 0, 103)
+func calculateMatrix(robots *[]*Robot) [][]int {
+	matrix := make([][]int, 0, HEIGHT)
 
-	for i := 0; i < 103; i++ {
-		row := make([]int, 0, 101)
-		for j := 0; j < 101; j++ {
+	for i := 0; i < HEIGHT; i++ {
+		row := make([]int, 0, WIDTH)
+		for j := 0; j < WIDTH; j++ {
 			row = append(row, 0)
 		}
 		matrix = append(matrix, row)
@@ -150,35 +153,69 @@ func printRobots(robots *[]*Robot) [][]int {
 		matrix[y][x] += 1
 	}
 
-	for _, row := range matrix {
-		fmt.Println(row)
-	}
-
 	return matrix
 }
 
-func Part1(rows *[]string) (int, error) {
+func printMatrix(matrix *[][]int, subMatrix *[][]int) {
+	if subMatrix != nil {
+		minX := (*subMatrix)[0][0]
+		minY := (*subMatrix)[0][1]
+		maxX := (*subMatrix)[1][0]
+		maxY := (*subMatrix)[1][1]
 
+		for y, row := range *matrix {
+			str := ""
+			for x, num := range row {
+				if x >= minX && x <= maxX && y >= minY && y <= maxY {
+					if num == 0 {
+						str = fmt.Sprintf("%s.", str)
+					} else {
+						str = fmt.Sprintf("%s%d", str, num)
+					}
+				} else {
+
+					str = fmt.Sprintf("%sx", str)
+				}
+			}
+			fmt.Println(str)
+		}
+	} else {
+		for _, row := range *matrix {
+			str := ""
+			for _, num := range row {
+				if num == 0 {
+					str = fmt.Sprintf("%s.", str)
+				} else {
+					str = fmt.Sprintf("%s%d", str, num)
+				}
+			}
+			fmt.Println(str)
+		}
+	}
+	fmt.Println("-")
+}
+
+func Part1(rows *[]string) (int, error) {
 	robots, err := parseInput(rows)
 
 	if err != nil {
 		return -1, err
 	}
 
-	//fmt.Println("START")
-	//matrix := printRobots(&robots)
-	//fmt.Println("-----------")
+	fmt.Println("START")
+	matrix := calculateMatrix(&robots)
+	fmt.Println("-----------")
 
 	for i := 0; i < 100; i++ {
 		for _, robot := range robots {
-			robot.move(101, 103)
+			robot.move(WIDTH, HEIGHT)
 		}
-		//fmt.Printf("After %d second\n", i+1)
-		//matrix = printRobots(&robots)
-		//fmt.Println("-----------")
+		fmt.Printf("After %d second\n", i+1)
+		matrix = calculateMatrix(&robots)
+		fmt.Println("-----------")
 	}
 
-	matrix := printRobots(&robots)
+	matrix = calculateMatrix(&robots)
 	sumInQuadrants := sumRobots(matrix)
 
 	fmt.Println(sumInQuadrants)
@@ -196,7 +233,161 @@ func Part1(rows *[]string) (int, error) {
 	return sum, nil
 }
 
-func Part2(rows *[]string) (int, error) {
+func sliceEq(a []int, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
 
-	return -1, fmt.Errorf("not implemented")
+	isEqual := false
+
+	for i := 0; i < len(a); i++ {
+		isEqual = a[i] == b[i]
+
+		if !isEqual {
+			break
+		}
+	}
+
+	return isEqual
+}
+
+func searchForChristmasTreePattern(start []int, matrix *[][]int, visited *map[string]struct{}) bool {
+	pattern := [][]int{
+		{0, 0, 0, 1, 0, 0, 0},
+		{0, 0, 1, 1, 1, 0, 0},
+		{0, 1, 1, 1, 1, 1, 0},
+		{1, 1, 1, 1, 1, 1, 1},
+	}
+
+	x := start[0]
+	y := start[1]
+
+	key := fmt.Sprintf("%d-%d", x, y)
+
+	_, alreadyVisited := (*visited)[key]
+
+	if alreadyVisited {
+		return false
+	}
+
+	if y < 0 || y+3 >= len(*matrix) {
+		return false
+	}
+
+	if x < 0 || x+6 >= len((*matrix)[y]) {
+		return false
+	}
+
+	hasPattern := false
+
+	//	clearConsole()
+	//	printMatrix(matrix, &[][]int{{x, y}, {x + 6, y + 3}})
+
+	for i := 0; i <= 3; i++ {
+		row := (*matrix)[y+i]
+		rowToCompare := row[x : x+7]
+
+		hasPattern = sliceEq(rowToCompare, pattern[i])
+
+		if !hasPattern {
+			break
+		}
+	}
+
+	//fmt.Println("WHOLE PATTERN", hasPattern)
+
+	if hasPattern {
+		return true
+	}
+
+	(*visited)[key] = struct{}{}
+
+	right := searchForChristmasTreePattern([]int{x + 1, y}, matrix, visited)
+
+	if right {
+		return true
+	}
+
+	down := searchForChristmasTreePattern([]int{x, y + 1}, matrix, visited)
+
+	if down {
+		return true
+	}
+
+	left := searchForChristmasTreePattern([]int{x - 1, y}, matrix, visited)
+
+	if left {
+		return true
+	}
+
+	top := searchForChristmasTreePattern([]int{x, y - 1}, matrix, visited)
+
+	if top {
+		return true
+	}
+
+	return false
+}
+
+func Part2(rows *[]string) (int, error) {
+	robots, err := parseInput(rows)
+
+	if err != nil {
+		return -1, err
+	}
+
+	matrix := calculateMatrix(&robots)
+
+	frame := 1
+	christmasTreeFrame := -1
+
+	//testMatrix := [][]int{
+	//	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	//	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	//	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	//	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	//	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	//	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+	//	{0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0},
+	//	{0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0},
+	//	{0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+	//	{0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	//	{0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	//}
+
+	//testVisited := make(map[string]struct{})
+	//testRes := searchForChristmasTreePattern([]int{0, 0}, &testMatrix, &testVisited)
+
+	//fmt.Println("TEST RES", testRes)
+
+	fmt.Printf("START\n\n")
+	printMatrix(&matrix, nil)
+
+	for frame < 10000 {
+		for _, robot := range robots {
+			robot.move(WIDTH, HEIGHT)
+		}
+		matrix = calculateMatrix(&robots)
+		clearConsole()
+		printMatrix(&matrix, nil)
+		fmt.Printf("Frame %d\n\n", frame)
+
+		visited := make(map[string]struct{})
+		patternFound := searchForChristmasTreePattern([]int{0, 0}, &matrix, &visited)
+
+		if patternFound {
+			christmasTreeFrame = frame
+			break
+		}
+
+		frame++
+	}
+
+	return christmasTreeFrame, nil
+}
+
+func clearConsole() {
+	cmd := exec.Command("clear") //Linux example, its tested
+	cmd.Stdout = os.Stdout
+	cmd.Run()
 }
