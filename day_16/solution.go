@@ -86,17 +86,18 @@ func calculatePoints(a []int, b []int, currentDirection Direction) int {
 	vector := []int{b[0] - a[0], b[1] - a[1]}
 	moveDirection := directionFromVector(vector)
 
-	// Why modulo?
-	// 0 -> 0
-	// 1 -> 1000
-	// 2 -> 2000
-	// 3 -> 1000
-	directionChange := int(math.Abs(float64(currentDirection-moveDirection))) % 2
-	//fmt.Printf("%sDirection change: %d\n", padding, directionChange)
+	directionChange := int(math.Abs(float64(currentDirection - moveDirection)))
 
-	directionChangePoints := directionChange * 1000
-
-	return 1 + directionChangePoints
+	switch directionChange {
+	case 1:
+		return 1001
+	case 2:
+		return 2001
+	case 3:
+		return 1001
+	default:
+		return 1
+	}
 }
 
 const maxInt int = int(^uint(0) >> 1)
@@ -191,4 +192,88 @@ func Part1(maze *[]string) (int, error) {
 func Part2(rows *[]string) (int, error) {
 
 	return -1, fmt.Errorf("not implemented")
+}
+
+func printMazeWithVisitedFields(maze *[]string, visitedFields [][]int) {
+	mazeToPrint := make([][]byte, 0, len(*maze))
+
+	for _, row := range *maze {
+		mazeToPrint = append(mazeToPrint, []byte(row))
+	}
+
+	for _, field := range visitedFields {
+		mazeToPrint[field[1]][field[0]] = 'O'
+	}
+
+	for _, row := range mazeToPrint {
+		fmt.Println(string(row))
+	}
+}
+
+func encodeVisitedKey(field []int, direction Direction) string {
+	visitedKey := encodeVector(field)
+	visitedKey = fmt.Sprintf("%s-%d", visitedKey, direction)
+
+	return visitedKey
+}
+
+func calculateVector(a []int, b []int) []int {
+	return []int{b[0] - a[0], b[1] - a[1]}
+}
+
+func validateNeighbor(field []int, neighbor []int, maze *[]string, visited *map[string]struct{}) bool {
+	mazeHeight := len(*maze)
+	mazeWidth := len((*maze)[0])
+	if neighbor[0] < 0 || neighbor[0] >= mazeWidth || neighbor[1] < 0 || neighbor[1] >= mazeHeight {
+		return false
+	}
+
+	if (*maze)[neighbor[1]][neighbor[0]] == '#' {
+		return false
+	}
+
+	//vector := calculateVector(field, neighbor)
+	//direction := directionFromVector(vector)
+	//visitedKey := encodeVisitedKey(neighbor, direction)
+	//_, alreadyVisited := (*visited)[visitedKey]
+
+	//return !alreadyVisited
+	return true
+}
+
+// [1 13] [1 12] [1 11] [1 10] [1 9] [2 9] [3 9] [3 8] [3 7] [4 7] [5 7]
+func getNeighborsForField(field []int, maze *[]string, visited *map[string]struct{}) [][]int {
+	neighbors := make([][]int, 0, 4)
+	x := field[0]
+	y := field[1]
+
+	n1 := []int{x + 1, y}
+	if validateNeighbor(field, n1, maze, visited) {
+		neighbors = append(neighbors, n1)
+	}
+
+	n2 := []int{x - 1, y}
+	if validateNeighbor(field, n2, maze, visited) {
+		neighbors = append(neighbors, n2)
+	}
+
+	n3 := []int{x, y + 1}
+	if validateNeighbor(field, n3, maze, visited) {
+		neighbors = append(neighbors, n3)
+	}
+
+	n4 := []int{x, y - 1}
+	if validateNeighbor(field, n4, maze, visited) {
+		neighbors = append(neighbors, n4)
+	}
+
+	return neighbors
+}
+
+func getPadding(depth int) string {
+	padding := ""
+	for i := 0; i < depth; i++ {
+		padding = fmt.Sprintf("%s ", padding)
+	}
+	return padding
 }
