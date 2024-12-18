@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type ChallengeId struct {
@@ -207,14 +208,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	start := time.Now()
 	result, err := runChallange(challengeId, &puzzleInput)
+	executionTime := time.Since(start)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "An error occurred when solving the puzzle:", err)
 		os.Exit(1)
 	}
 
-	fmt.Println(fmt.Sprintf("Result: %d", result))
+	fmt.Println(fmt.Sprintf("Result: %d, execution time: %v", result, executionTime))
 
 	os.Exit(0)
 }
