@@ -37,7 +37,7 @@ func encodeVector(vector []int) string {
 }
 
 func decodeVector(vectorStr string) []int {
-	split := strings.Split(vectorStr, ",")
+	split := strings.Split(vectorStr, "-")
 
 	if len(split) != 2 {
 		panic(fmt.Sprintf("Invalid vector string %s", vectorStr))
@@ -69,17 +69,8 @@ type state struct {
 func (s state) NextState(destination []int) state {
 	moveDirection := calculateVector(s.Field, destination)
 
-	points := 1
-
-	vecSum := []int{s.CurrentDirection[0] + moveDirection[0], s.CurrentDirection[1] + moveDirection[1]}
-
-	if vecSum[0] == 0 && vecSum[1] == 0 {
-		points += 2000
-	}
-
-	if vecSum[0] != 0 && vecSum[1] != 0 {
-		points += 1000
-	}
+	pointsForDirectionChange := PointsForDirectionChange(s.CurrentDirection, moveDirection)
+	points := 1 + pointsForDirectionChange
 
 	nextState := state{
 		Field:            destination,
@@ -89,6 +80,22 @@ func (s state) NextState(destination []int) state {
 	}
 
 	return nextState
+}
+
+func PointsForDirectionChange(currentDirection []int, direction []int) int {
+	vecSum := []int{currentDirection[0] + direction[0], currentDirection[1] + direction[1]}
+
+	points := 0
+
+	if vecSum[0] == 0 && vecSum[1] == 0 {
+		points += 2000
+	}
+
+	if vecSum[0] != 0 && vecSum[1] != 0 {
+		points += 1000
+	}
+
+	return points
 }
 
 func (s state) KeyWithDirection() string {
@@ -102,62 +109,93 @@ func (s state) Key() string {
 	return encodeVector(s.Field)
 }
 
-func FindShortestPath(current state, maze *[]string, pointsMap *map[string]int, visited *map[string]struct{}) {
-	currentLowestPointsForField, alreadyHasPoints := (*pointsMap)[current.Key()]
-	if alreadyHasPoints && currentLowestPointsForField < current.Points {
+func (s state) IsStrictlyBetter(otherState state) bool {
+	if vectorEq(s.CurrentDirection, otherState.CurrentDirection) {
+		return s.Points < otherState.Points
+	} else {
+		pointsForDirectionChange := PointsForDirectionChange(otherState.CurrentDirection, s.CurrentDirection)
+
+		return s.Points < otherState.Points+pointsForDirectionChange
+	}
+}
+
+func (s state) IsBetterOrEqual(otherState state) bool {
+	if vectorEq(s.CurrentDirection, otherState.CurrentDirection) {
+		return s.Points <= otherState.Points
+	} else {
+		pointsForDirectionChange := PointsForDirectionChange(otherState.CurrentDirection, s.CurrentDirection)
+
+		return s.Points <= otherState.Points+pointsForDirectionChange
+	}
+}
+
+func vectorEq(a []int, b []int) bool {
+	return a[0] == b[0] && a[1] == b[1]
+}
+
+func FindShortestPath(current state, maze *[]string, pointsMap *map[string]state) {
+	currentLowestState, alreadyHasPoints := (*pointsMap)[current.Key()]
+	if alreadyHasPoints && !current.IsBetterOrEqual(currentLowestState) {
 		return
 	}
 
-	neighbors := getNeighborsForField(current, maze, visited)
+	neighbors := getNeighborsForField(current, maze, nil)
 
 	for _, n := range neighbors {
 		nextState := current.NextState(n)
 		nextStateKey := nextState.Key()
 
-		currentBestPointsForNeighbor, hasPoints := (*pointsMap)[nextStateKey]
-		if !hasPoints {
-			currentBestPointsForNeighbor = maxInt
-		}
-
-		if nextState.Points < currentBestPointsForNeighbor {
-			(*pointsMap)[nextStateKey] = nextState.Points
+		currentBestPointsForNeighbor, hasBestState := (*pointsMap)[nextStateKey]
+		if hasBestState {
+			if nextState.IsStrictlyBetter(currentBestPointsForNeighbor) {
+				(*pointsMap)[nextStateKey] = nextState
+				if (*maze)[nextState.Field[1]][nextState.Field[0]] != 'E' {
+					FindShortestPath(nextState, maze, pointsMap)
+				}
+			}
+		} else {
+			(*pointsMap)[nextStateKey] = nextState
 			if (*maze)[nextState.Field[1]][nextState.Field[0]] != 'E' {
-				FindShortestPath(nextState, maze, pointsMap, visited)
+				FindShortestPath(nextState, maze, pointsMap)
 			}
 		}
 	}
-	(*visited)[current.KeyWithDirection()] = struct{}{}
 }
 
-func FindAllShortestPaths(current state, maze *[]string, pointsMap *map[string]int, visited *map[string]struct{}) {
-	currentLowestPointsForField, alreadyHasPoints := (*pointsMap)[current.Key()]
-	if alreadyHasPoints && currentLowestPointsForField < current.Points {
+func FindAllShortestPaths(current state, maze *[]string, pointsMap *map[string]state, shortestPathPoints int, endStates *[]state) {
+	if current.Points > shortestPathPoints {
 		return
 	}
 
-	neighbors := getNeighborsForField(current, maze, visited)
+	neighbors := getNeighborsForField(current, maze, nil)
 
 	for _, n := range neighbors {
 		nextState := current.NextState(n)
 		nextStateKey := nextState.Key()
 
-		currentBestPointsForNeighbor, hasPoints := (*pointsMap)[nextStateKey]
-		if !hasPoints {
-			currentBestPointsForNeighbor = maxInt
-		}
-
-		if nextState.Points < currentBestPointsForNeighbor {
-			(*pointsMap)[nextStateKey] = nextState.Points
+		currentBestPointsForNeighbor, hasBestState := (*pointsMap)[nextStateKey]
+		if hasBestState {
+			if nextState.IsBetterOrEqual(currentBestPointsForNeighbor) {
+				(*pointsMap)[nextStateKey] = nextState
+				if (*maze)[nextState.Field[1]][nextState.Field[0]] != 'E' {
+					FindAllShortestPaths(nextState, maze, pointsMap, shortestPathPoints, endStates)
+				} else {
+					*endStates = append(*endStates, nextState)
+				}
+			}
+		} else {
+			(*pointsMap)[nextStateKey] = nextState
 			if (*maze)[nextState.Field[1]][nextState.Field[0]] != 'E' {
-				FindShortestPath(nextState, maze, pointsMap, visited)
+				FindAllShortestPaths(nextState, maze, pointsMap, shortestPathPoints, endStates)
+			} else {
+				*endStates = append(*endStates, nextState)
 			}
 		}
 	}
 }
 
 func Part1(maze *[]string) (int, error) {
-	pointsMap := make(map[string]int)
-	visited := make(map[string]struct{})
+	pointsMap := make(map[string]state)
 	start, finish, err := findStartAndFinish(maze)
 
 	if err != nil {
@@ -169,18 +207,18 @@ func Part1(maze *[]string) (int, error) {
 		CurrentDirection: []int{1, 0},
 		Points:           0,
 		Path:             [][]int{start},
-	}, maze, &pointsMap, &visited)
+	}, maze, &pointsMap)
 
 	points, hasPoints := pointsMap[encodeVector(finish)]
 	if !hasPoints {
 		return -1, fmt.Errorf("Shortest path not found")
 	}
 
-	return points, nil
+	return points.Points, nil
 }
 
 func Part2(maze *[]string) (int, error) {
-	pointsMap := make(map[string]int)
+	pointsMap := make(map[string]state)
 	start, finish, err := findStartAndFinish(maze)
 
 	if err != nil {
@@ -192,19 +230,45 @@ func Part2(maze *[]string) (int, error) {
 		CurrentDirection: []int{1, 0},
 		Points:           0,
 		Path:             [][]int{start},
-	}, maze, &pointsMap, nil)
-	//GoThroughMaze(start, 1000, Up, maze, &pointsMap)
-	//GoThroughMaze(start, 1000, Down, maze, &pointsMap)
-	//GoThroughMaze(start, 2000, Left, maze, &pointsMap)
+	}, maze, &pointsMap)
 
-	//fmt.Printf("%v", pointsMap)
+	shortestPathLen, hasPoints := pointsMap[encodeVector(finish)]
 
-	points, hasPoints := pointsMap[encodeVector(finish)]
 	if !hasPoints {
 		return -1, fmt.Errorf("Shortest path not found")
 	}
 
-	return points, nil
+	fmt.Println("Shortest path", shortestPathLen)
+
+	var endStates []state
+	pointsMap = make(map[string]state)
+
+	FindAllShortestPaths(
+		state{
+			Field:            start,
+			CurrentDirection: []int{1, 0},
+			Points:           0,
+			Path:             [][]int{start},
+		}, maze, &pointsMap, shortestPathLen.Points, &endStates,
+	)
+	fmt.Printf("end states: %v, points map: %v\n", endStates, pointsMap)
+
+	visitedFieldsMap := make(map[string]struct{})
+
+	for _, endState := range endStates {
+		fmt.Printf("Path: %v\n", endState.Path)
+		for _, field := range endState.Path {
+			visitedFieldsMap[encodeVector(field)] = struct{}{}
+		}
+	}
+	visitedFields := make([][]int, 0, len(visitedFieldsMap))
+	for key := range visitedFieldsMap {
+		visitedFields = append(visitedFields, decodeVector(key))
+	}
+
+	printMazeWithVisitedFields(maze, visitedFields)
+
+	return len(visitedFieldsMap), nil
 }
 
 func printMazeWithVisitedFields(maze *[]string, visitedFields [][]int) {
@@ -230,6 +294,12 @@ func calculateVector(a []int, b []int) []int {
 func validateNeighbor(current state, neighbor []int, maze *[]string, visited *map[string]struct{}) bool {
 	mazeHeight := len(*maze)
 	mazeWidth := len((*maze)[0])
+	moveDirection := calculateVector(current.Field, neighbor)
+
+	vecDiff := []int{moveDirection[0] + current.CurrentDirection[0], moveDirection[1] + current.CurrentDirection[1]}
+	if vecDiff[0] == 0 && vecDiff[1] == 0 {
+		return false
+	}
 
 	if neighbor[0] < 0 || neighbor[0] >= mazeWidth || neighbor[1] < 0 || neighbor[1] >= mazeHeight {
 		return false
