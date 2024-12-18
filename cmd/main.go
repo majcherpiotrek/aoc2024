@@ -16,6 +16,7 @@ import (
 	"aoc2024/day_14"
 	"aoc2024/day_15"
 	"aoc2024/day_16"
+	"aoc2024/day_18"
 	"bufio"
 	"fmt"
 	"os"
@@ -180,6 +181,12 @@ func runChallange(challengeId ChallengeId, puzzleInput *[]string) (int, error) {
 			return day_16.Part1(puzzleInput)
 		} else {
 			return day_16.Part2(puzzleInput)
+		}
+	case 18:
+		if challengeId.Part == 1 {
+			return day_18.Part1(puzzleInput)
+		} else {
+			return day_18.Part2(puzzleInput)
 		}
 	default:
 		return -1, fmt.Errorf("Not implemented yet")
