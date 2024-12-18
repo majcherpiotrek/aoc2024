@@ -132,8 +132,108 @@ func Part1(input *[]string) (int, error) {
 	return distance, nil
 }
 
-func Part2(maze *[]string) (int, error) {
-	return -1, fmt.Errorf("not implemented")
+func Part2(input *[]string) (int, error) {
+	corruptedFields := parseInput(input)
+	memoryMap := make([][]byte, gridSize)
+	maxInt := int(^uint(0) >> 1)
+
+	for y := 0; y < gridSize; y++ {
+		row := make([]byte, gridSize)
+		memoryMap[y] = row
+		for x := 0; x < gridSize; x++ {
+			memoryMap[y][x] = '.'
+		}
+	}
+
+	pathCutOff := []int{-1, -1}
+	for numberOfCorruptedBytes := 1025; numberOfCorruptedBytes < len(corruptedFields); numberOfCorruptedBytes++ {
+		for i := 0; i < numberOfCorruptedBytes && i < len(corruptedFields); i++ {
+			field := corruptedFields[i]
+			memoryMap[field[1]][field[0]] = '#'
+		}
+
+		fmt.Printf("Byte %d, value: %v\n", numberOfCorruptedBytes-1, corruptedFields[numberOfCorruptedBytes-1])
+		printMemory(&memoryMap)
+
+		h := &MinHeap{}
+		heap.Init(h)
+		distances := make(map[string]int)
+
+		for y := 0; y < gridSize; y++ {
+			for x := 0; x < gridSize; x++ {
+				if memoryMap[y][x] == '.' {
+					point := Point{
+						X:        x,
+						Y:        y,
+						Distance: maxInt,
+					}
+					if x == 0 && y == 0 {
+						point.Distance = 0
+					}
+
+					distances[encodeVector([]int{x, y})] = point.Distance
+					heap.Push(h, point)
+				}
+			}
+		}
+
+		distance := -1
+		fmt.Printf("Heap len %d\n", h.Len())
+
+		for current := heap.Pop(h).(Point); h.Len() > 0; current = heap.Pop(h).(Point) {
+			if current.Distance == maxInt {
+				break
+			}
+
+			if current.X == gridSize-1 && current.Y == gridSize-1 {
+				distance = current.Distance
+				break
+			}
+
+			neighbors := [][]int{
+				{current.X + 1, current.Y},
+				{current.X, current.Y + 1},
+				{current.X - 1, current.Y},
+				{current.X, current.Y - 1},
+			}
+
+			for _, n := range neighbors {
+				if n[0] < 0 || n[1] < 0 || n[0] >= gridSize || n[1] >= gridSize {
+					continue
+				}
+
+				if memoryMap[n[1]][n[0]] == '#' {
+					continue
+				}
+
+				currentDistance, hasDistance := distances[encodeVector([]int{current.X, current.Y})]
+				if !hasDistance {
+					panic("Should not happen")
+				}
+				neighborShortestDistance, hasDistance := distances[encodeVector(n)]
+				if !hasDistance {
+					panic("Should not happen")
+				}
+
+				newNeighborDistance := currentDistance + 1
+				if newNeighborDistance < neighborShortestDistance {
+					distances[encodeVector(n)] = newNeighborDistance
+					h.UpdateDistance(n[0], n[1], newNeighborDistance)
+				}
+			}
+		}
+
+		if distance == -1 {
+			pathCutOff = corruptedFields[numberOfCorruptedBytes-1]
+			break
+		}
+		fmt.Printf("Dist %d\n", distance)
+		fmt.Println("----")
+	}
+
+	fmt.Printf("Can't find a path at byte with coords: %v\n", pathCutOff)
+
+	return 0, nil
 }
 
 type Point struct {
