@@ -33,15 +33,6 @@ func findStartAndFinish(maze *[]string) ([]int, []int, error) {
 	return start, finish, nil
 }
 
-type Direction int
-
-const (
-	Up = iota
-	Right
-	Down
-	Left
-)
-
 func encodeVector(vector []int) string {
 	return fmt.Sprintf("%d,%d", vector[0], vector[1])
 }
@@ -67,21 +58,6 @@ func decodeVector(vectorStr string) []int {
 	return []int{x, y}
 }
 
-func directionFromVector(vector []int) Direction {
-	switch encodeVector(vector) {
-	case "1,0":
-		return Right
-	case "-1,0":
-		return Left
-	case "0,1":
-		return Down
-	case "0,-1":
-		return Up
-	default:
-		panic(fmt.Sprintf("Invalid vector %v, can't convert to Direction", vector))
-	}
-}
-
 func calculatePoints(a []int, b []int, currentDirection Direction) int {
 	vector := []int{b[0] - a[0], b[1] - a[1]}
 	moveDirection := directionFromVector(vector)
@@ -102,45 +78,49 @@ func calculatePoints(a []int, b []int, currentDirection Direction) int {
 
 const maxInt int = int(^uint(0) >> 1)
 
-func GoThroughMaze(currentField []int, currentPoints int, currentDirection Direction, maze *[]string, pointsMap *map[string]int, depth int) {
-	neighbors := make([][]int, 0, 4)
+type state struct {
+	Field            []int
+	CurrentDirection []int
+	Points           int
+	Path             [][]int
+}
 
-	//padding := ""
-	//for i := 0; i < depth; i++ {
-	//	padding = fmt.Sprintf("%s ", padding)
-	//}
+func (s state) NextState(destination []int) state {
+	moveDirection := calculateVector(s.Field, destination)
 
-	mazeHeight := len(*maze)
-	mazeWidth := len((*maze)[0])
-	x := currentField[0]
-	y := currentField[1]
+	points := 1
+
+	vecSum := []int{s.CurrentDirection[0] + moveDirection[0], s.CurrentDirection[1] + moveDirection[1]}
+
+	if vecSum[0] == 0 && vecSum[1] == 0 {
+		points += 2000
+	}
+
+	if vecSum[0] != 0 && vecSum[1] != 0 {
+		points += 1000
+	}
+
+	nextState := state{
+		Field:            destination,
+		CurrentDirection: moveDirection,
+		Points:           s.Points + points,
+		Path:             append(s.Path, destination),
+	}
+
+	return nextState
+}
+
+func FindShortestPath(currentField []int, currentPoints int, currentDirection Direction, maze *[]string, pointsMap *map[string]int, visited *map[string]struct{}, depth int) {
 
 	currentLowestPointsForField, alreadyHasPoints := (*pointsMap)[encodeVector(currentField)]
 	if alreadyHasPoints && currentLowestPointsForField < currentPoints {
 		return
 	}
 
-	if x+1 < mazeWidth {
-		neighbors = append(neighbors, []int{x + 1, y})
-	}
-	if x-1 >= 0 {
-		neighbors = append(neighbors, []int{x - 1, y})
-	}
-	if y+1 < mazeHeight {
-		neighbors = append(neighbors, []int{x, y + 1})
-	}
-	if y-1 >= 0 {
-		neighbors = append(neighbors, []int{x, y - 1})
-	}
+	neighbors := getNeighborsForField(currentField, maze, visited)
 
 	for _, n := range neighbors {
 		neighborValue := (*maze)[n[1]][n[0]]
-		//fmt.Printf("%sCurrentField: %v, currentPoints: %d, currentDirection: %d, neighbor: %v, value: %c\n", padding, currentField, currentPoints, currentDirection, n, neighborValue)
-
-		if neighborValue == '#' {
-			//fmt.Printf("%sSkipping, wall ahead\n\n", padding)
-			continue
-		}
 
 		key := encodeVector(n)
 		points, hasPoints := (*pointsMap)[key]
@@ -160,7 +140,7 @@ func GoThroughMaze(currentField []int, currentPoints int, currentDirection Direc
 		if updatedPoints < points {
 			(*pointsMap)[key] = updatedPoints
 			if neighborValue != 'E' {
-				GoThroughMaze(n, updatedPoints, moveDirection, maze, pointsMap, depth+1)
+				FindShortestPath(n, updatedPoints, moveDirection, maze, pointsMap, depth+1)
 			}
 		}
 	}
@@ -174,7 +154,7 @@ func Part1(maze *[]string) (int, error) {
 		return -1, err
 	}
 
-	GoThroughMaze(start, 0, Right, maze, &pointsMap, 0)
+	FindShortestPath(start, 0, Right, maze, &pointsMap, 0)
 	//GoThroughMaze(start, 1000, Up, maze, &pointsMap)
 	//GoThroughMaze(start, 1000, Down, maze, &pointsMap)
 	//GoThroughMaze(start, 2000, Left, maze, &pointsMap)
@@ -224,6 +204,7 @@ func calculateVector(a []int, b []int) []int {
 func validateNeighbor(field []int, neighbor []int, maze *[]string, visited *map[string]struct{}) bool {
 	mazeHeight := len(*maze)
 	mazeWidth := len((*maze)[0])
+
 	if neighbor[0] < 0 || neighbor[0] >= mazeWidth || neighbor[1] < 0 || neighbor[1] >= mazeHeight {
 		return false
 	}
@@ -232,12 +213,14 @@ func validateNeighbor(field []int, neighbor []int, maze *[]string, visited *map[
 		return false
 	}
 
-	//vector := calculateVector(field, neighbor)
-	//direction := directionFromVector(vector)
-	//visitedKey := encodeVisitedKey(neighbor, direction)
-	//_, alreadyVisited := (*visited)[visitedKey]
+	if visited != nil {
+		vector := calculateVector(field, neighbor)
+		direction := directionFromVector(vector)
+		visitedKey := encodeVisitedKey(neighbor, direction)
+		_, alreadyVisited := (*visited)[visitedKey]
 
-	//return !alreadyVisited
+		return !alreadyVisited
+	}
 	return true
 }
 
