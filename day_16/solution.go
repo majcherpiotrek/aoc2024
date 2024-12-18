@@ -2,7 +2,6 @@ package day_16
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 )
@@ -34,7 +33,7 @@ func findStartAndFinish(maze *[]string) ([]int, []int, error) {
 }
 
 func encodeVector(vector []int) string {
-	return fmt.Sprintf("%d,%d", vector[0], vector[1])
+	return fmt.Sprintf("%d-%d", vector[0], vector[1])
 }
 
 func decodeVector(vectorStr string) []int {
@@ -56,24 +55,6 @@ func decodeVector(vectorStr string) []int {
 	}
 
 	return []int{x, y}
-}
-
-func calculatePoints(a []int, b []int, currentDirection Direction) int {
-	vector := []int{b[0] - a[0], b[1] - a[1]}
-	moveDirection := directionFromVector(vector)
-
-	directionChange := int(math.Abs(float64(currentDirection - moveDirection)))
-
-	switch directionChange {
-	case 1:
-		return 1001
-	case 2:
-		return 2001
-	case 3:
-		return 1001
-	default:
-		return 1
-	}
 }
 
 const maxInt int = int(^uint(0) >> 1)
@@ -110,37 +91,38 @@ func (s state) NextState(destination []int) state {
 	return nextState
 }
 
-func FindShortestPath(currentField []int, currentPoints int, currentDirection Direction, maze *[]string, pointsMap *map[string]int, visited *map[string]struct{}, depth int) {
+func (s state) KeyWithDirection() string {
+	key := encodeVector(s.Field)
+	key = fmt.Sprintf("%s-%d-%d", key, s.CurrentDirection[0], s.CurrentDirection[1])
 
-	currentLowestPointsForField, alreadyHasPoints := (*pointsMap)[encodeVector(currentField)]
-	if alreadyHasPoints && currentLowestPointsForField < currentPoints {
+	return key
+}
+
+func (s state) Key() string {
+	return encodeVector(s.Field)
+}
+
+func FindShortestPath(current state, maze *[]string, pointsMap *map[string]int, visited *map[string]struct{}) {
+	currentLowestPointsForField, alreadyHasPoints := (*pointsMap)[current.Key()]
+	if alreadyHasPoints && currentLowestPointsForField < current.Points {
 		return
 	}
 
-	neighbors := getNeighborsForField(currentField, maze, visited)
+	neighbors := getNeighborsForField(current, maze, visited)
 
 	for _, n := range neighbors {
-		neighborValue := (*maze)[n[1]][n[0]]
+		nextState := current.NextState(n)
+		nextStateKey := nextState.Key()
 
-		key := encodeVector(n)
-		points, hasPoints := (*pointsMap)[key]
+		currentBestPointsForNeighbor, hasPoints := (*pointsMap)[nextStateKey]
 		if !hasPoints {
-			points = maxInt
+			currentBestPointsForNeighbor = maxInt
 		}
 
-		vector := []int{n[0] - currentField[0], n[1] - currentField[1]}
-		moveDirection := directionFromVector(vector)
-		//fmt.Printf("%sMove direction: %d\n", padding, moveDirection)
-		pointsForMove := calculatePoints(currentField, n, currentDirection)
-		//fmt.Printf("%sPoints for move: %d\n", padding, pointsForMove)
-		updatedPoints := pointsForMove + currentPoints
-
-		//fmt.Printf("%sCurrent neighbor points: %d, updatedPoints: %d\n\n", padding, points, updatedPoints)
-
-		if updatedPoints < points {
-			(*pointsMap)[key] = updatedPoints
-			if neighborValue != 'E' {
-				FindShortestPath(n, updatedPoints, moveDirection, maze, pointsMap, depth+1)
+		if nextState.Points < currentBestPointsForNeighbor {
+			(*pointsMap)[nextStateKey] = nextState.Points
+			if (*maze)[nextState.Field[1]][nextState.Field[0]] != 'E' {
+				FindShortestPath(nextState, maze, pointsMap, visited)
 			}
 		}
 	}
@@ -154,19 +136,24 @@ func Part1(maze *[]string) (int, error) {
 		return -1, err
 	}
 
-	FindShortestPath(start, 0, Right, maze, &pointsMap, 0)
+	FindShortestPath(state{
+		Field:            start,
+		CurrentDirection: []int{1, 0},
+		Points:           0,
+		Path:             [][]int{start},
+	}, maze, &pointsMap, nil)
 	//GoThroughMaze(start, 1000, Up, maze, &pointsMap)
 	//GoThroughMaze(start, 1000, Down, maze, &pointsMap)
 	//GoThroughMaze(start, 2000, Left, maze, &pointsMap)
 
 	//fmt.Printf("%v", pointsMap)
 
-	result, hasResult := pointsMap[encodeVector(finish)]
-	if !hasResult {
-		return -1, fmt.Errorf("Could not find path")
+	points, hasPoints := pointsMap[encodeVector(finish)]
+	if !hasPoints {
+		return -1, fmt.Errorf("Shortest path not found")
 	}
 
-	return result, nil
+	return points, nil
 }
 
 func Part2(rows *[]string) (int, error) {
@@ -190,18 +177,11 @@ func printMazeWithVisitedFields(maze *[]string, visitedFields [][]int) {
 	}
 }
 
-func encodeVisitedKey(field []int, direction Direction) string {
-	visitedKey := encodeVector(field)
-	visitedKey = fmt.Sprintf("%s-%d", visitedKey, direction)
-
-	return visitedKey
-}
-
 func calculateVector(a []int, b []int) []int {
 	return []int{b[0] - a[0], b[1] - a[1]}
 }
 
-func validateNeighbor(field []int, neighbor []int, maze *[]string, visited *map[string]struct{}) bool {
+func validateNeighbor(current state, neighbor []int, maze *[]string, visited *map[string]struct{}) bool {
 	mazeHeight := len(*maze)
 	mazeWidth := len((*maze)[0])
 
@@ -214,39 +194,36 @@ func validateNeighbor(field []int, neighbor []int, maze *[]string, visited *map[
 	}
 
 	if visited != nil {
-		vector := calculateVector(field, neighbor)
-		direction := directionFromVector(vector)
-		visitedKey := encodeVisitedKey(neighbor, direction)
-		_, alreadyVisited := (*visited)[visitedKey]
+		nextState := current.NextState(neighbor)
+		_, alreadyVisited := (*visited)[nextState.KeyWithDirection()]
 
 		return !alreadyVisited
 	}
 	return true
 }
 
-// [1 13] [1 12] [1 11] [1 10] [1 9] [2 9] [3 9] [3 8] [3 7] [4 7] [5 7]
-func getNeighborsForField(field []int, maze *[]string, visited *map[string]struct{}) [][]int {
+func getNeighborsForField(current state, maze *[]string, visited *map[string]struct{}) [][]int {
 	neighbors := make([][]int, 0, 4)
-	x := field[0]
-	y := field[1]
+	x := current.Field[0]
+	y := current.Field[1]
 
 	n1 := []int{x + 1, y}
-	if validateNeighbor(field, n1, maze, visited) {
+	if validateNeighbor(current, n1, maze, visited) {
 		neighbors = append(neighbors, n1)
 	}
 
 	n2 := []int{x - 1, y}
-	if validateNeighbor(field, n2, maze, visited) {
+	if validateNeighbor(current, n2, maze, visited) {
 		neighbors = append(neighbors, n2)
 	}
 
 	n3 := []int{x, y + 1}
-	if validateNeighbor(field, n3, maze, visited) {
+	if validateNeighbor(current, n3, maze, visited) {
 		neighbors = append(neighbors, n3)
 	}
 
 	n4 := []int{x, y - 1}
-	if validateNeighbor(field, n4, maze, visited) {
+	if validateNeighbor(current, n4, maze, visited) {
 		neighbors = append(neighbors, n4)
 	}
 
