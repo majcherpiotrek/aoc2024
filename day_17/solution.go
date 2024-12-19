@@ -79,13 +79,13 @@ func (p *processor) readComboOperand(operand int) (int, error) {
 }
 
 func (p *processor) division(operandValue int, targetRegister *int) {
-	fmt.Printf("Operand value: %d, target register: %p, targetRegisterValue: %d\n", operandValue, targetRegister, *targetRegister)
+	//fmt.Printf("Operand value: %d, target register: %p, targetRegisterValue: %d\n", operandValue, targetRegister, *targetRegister)
 	*targetRegister = p.registers.A / int(math.Pow(2, float64(operandValue)))
 }
 
 func (p *processor) tick() error {
 	instruction, operand, err := p.readCurrentInstruction()
-	fmt.Printf("Process instruction - pointer: %d: instruciton: %d, operand: %d\n", p.insPointer, instruction, operand)
+	//fmt.Printf("Process instruction - pointer: %d: instruciton: %d, operand: %d\n", p.insPointer, instruction, operand)
 
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func (p *processor) tick() error {
 		case cdv:
 			targetRegister = &p.registers.C
 		}
-		fmt.Println("Running division")
+		//fmt.Println("Running division")
 		p.division(operandValue, targetRegister)
 		p.insPointer += 2
 		return nil
@@ -137,7 +137,7 @@ func (p *processor) tick() error {
 	case out:
 		operandValue, err := p.readComboOperand(operand)
 		result := operandValue % 8
-		fmt.Printf("OUT %d mod 8 = %d\n", operandValue, result)
+		//fmt.Printf("OUT %d mod 8 = %d\n", operandValue, result)
 		if err != nil {
 			return err
 		}
@@ -149,9 +149,9 @@ func (p *processor) tick() error {
 }
 
 func (p *processor) Run() string {
-	fmt.Printf("Start program. Pointer: %d, Registers: %v, Program: %v\n", p.insPointer, p.registers, p.in)
+	//fmt.Printf("Start program. Pointer: %d, Registers: %v, Program: %v\n", p.insPointer, p.registers, p.in)
 	for err := p.tick(); err == nil; err = p.tick() {
-		fmt.Printf("STATE: registers: %v, pointer: %d, out: %v\n", p.registers, p.insPointer, p.Out)
+		//fmt.Printf("STATE: registers: %v, pointer: %d, out: %v\n", p.registers, p.insPointer, p.Out)
 	}
 
 	result := ""
@@ -226,5 +226,82 @@ func Part1(input *[]string) (int, error) {
 }
 
 func Part2(input *[]string) (int, error) {
-	return -1, fmt.Errorf("not implemented")
+	a, b, c := -1, -1, -1
+	var p processor
+
+	for i := 0; i < len(*input); i++ {
+		row := (*input)[i]
+
+		if len(row) == 0 {
+			continue
+		}
+
+		split := strings.Split(row, ": ")
+		if len(split) != 2 {
+			return -1, fmt.Errorf("Invalid input row: %s", row)
+		}
+
+		if i < 3 {
+			n, err := strconv.Atoi(split[1])
+			if err != nil {
+				return -1, err
+			}
+			if i == 0 {
+				a = n
+			}
+			if i == 1 {
+				b = n
+			}
+			if i == 2 {
+				c = n
+			}
+			continue
+		}
+
+		numstr := strings.Split(split[1], ",")
+		program := make([]int, 0, len(numstr))
+
+		for _, s := range numstr {
+			n, err := strconv.Atoi(s)
+			if err != nil {
+				return -1, err
+			}
+			program = append(program, n)
+		}
+
+		p = NewProcessor(registers{
+			A: a,
+			B: b,
+			C: c,
+		}, program)
+	}
+
+	expectedResult := ""
+	for _, n := range p.in {
+		if len(expectedResult) == 0 {
+			expectedResult = fmt.Sprintf("%d", n)
+		} else {
+			expectedResult = fmt.Sprintf("%s,%d", expectedResult, n)
+		}
+	}
+
+	a = 1
+
+	for true {
+		proc := NewProcessor(registers{
+			A: a,
+			B: p.registers.B,
+			C: p.registers.C,
+		}, p.in)
+
+		result := proc.Run()
+
+		fmt.Printf("Result for A=%d - %v\n", a, result)
+		if result == expectedResult {
+			break
+		}
+		a++
+	}
+
+	return a, nil
 }
