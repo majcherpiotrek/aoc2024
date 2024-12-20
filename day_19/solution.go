@@ -6,16 +6,6 @@ import (
 	"strings"
 )
 
-type PatternColor byte
-
-const (
-	white = 'w'
-	blue  = 'u'
-	black = 'b'
-	red   = 'r'
-	green = 'g'
-)
-
 func canBuildDesign(design string, availablePatterns *[]string, cache *map[string]bool) bool {
 	if len(design) == 0 {
 		return true
