@@ -72,21 +72,8 @@ func (pad *Pad) shortestPath(a byte, b byte) []byte {
 
 	diffX := bCoords[0] - aCoords[0]
 	diffY := bCoords[1] - aCoords[1]
-	// fmt.Printf("%c: %v -> %c: %v; Diff: %d, %d\n", a, aCoords, b, bCoords, diffX, diffY)
 	diffXAbs := int(math.Abs(float64(diffX)))
 	diffYAbs := int(math.Abs(float64(diffY)))
-
-	if diffX == 0 || diffY == 0 {
-		if diffX > 0 {
-			return []byte(strings.Repeat(">", diffXAbs))
-		} else if diffX < 0 {
-			return []byte(strings.Repeat("<", diffXAbs))
-		} else if diffY > 0 {
-			return []byte(strings.Repeat("v", diffYAbs))
-		} else {
-			return []byte(strings.Repeat("^", diffYAbs))
-		}
-	}
 
 	horizontalMove := ">"
 	if diffX < 0 {
@@ -100,37 +87,25 @@ func (pad *Pad) shortestPath(a byte, b byte) []byte {
 	horizontalSequence := []byte(strings.Repeat(horizontalMove, diffXAbs))
 	verticalSequence := []byte(strings.Repeat(veritcalMove, diffYAbs))
 
-	seq := make([]byte, 0, len(horizontalSequence)+len(verticalSequence))
-	if horizontalMove == "<" {
-		if pad.Gap[1] == aCoords[1] && pad.Gap[0] < aCoords[0] && pad.Gap[0] >= aCoords[0]-diffXAbs {
-			// Will hit it horizontally
-			seq = append(seq, verticalSequence...)
-			seq = append(seq, horizontalSequence...)
-		} else {
-			seq = append(seq, horizontalSequence...)
-			seq = append(seq, verticalSequence...)
-		}
-	} else if veritcalMove == "v" {
-		if pad.Gap[0] == aCoords[0] && pad.Gap[1] > aCoords[1] && pad.Gap[1] <= aCoords[1]+diffYAbs {
-			// will hit it vertically
-			seq = append(seq, horizontalSequence...)
-			seq = append(seq, verticalSequence...)
-		} else {
-			seq = append(seq, verticalSequence...)
-			seq = append(seq, horizontalSequence...)
-		}
-	} else {
-		if pad.Gap[0] == aCoords[0] && pad.Gap[1] > aCoords[1] && pad.Gap[1] <= aCoords[1]+diffYAbs {
-			// will hit it vertically
-			seq = append(seq, horizontalSequence...)
-			seq = append(seq, verticalSequence...)
-		} else {
-			seq = append(seq, verticalSequence...)
-			seq = append(seq, horizontalSequence...)
-		}
+	willHitGapHorizontally := pad.Gap[1] == aCoords[1] &&
+		((pad.Gap[0] <= aCoords[0] && pad.Gap[0] >= aCoords[0]+diffX) ||
+			(pad.Gap[0] >= aCoords[0] && pad.Gap[0] <= aCoords[0]+diffX))
+
+	willHitGapVertically := pad.Gap[0] == aCoords[0] &&
+		((pad.Gap[1] <= aCoords[1] && pad.Gap[1] >= aCoords[1]+diffY) ||
+			(pad.Gap[1] >= aCoords[1] && pad.Gap[1] <= aCoords[1]+diffY))
+
+	// Prefer vertical keys first, because it can be 'v', which is more expensive than '>' that is left for horizontal moves. '^' and '>' are equally expensive
+	visitFirst := verticalSequence
+	visitSecond := horizontalSequence
+
+	// Prefer < first because it's the most expensive key to reach
+	if (horizontalMove == "<" && !willHitGapHorizontally) || willHitGapVertically {
+		visitFirst = horizontalSequence
+		visitSecond = verticalSequence
 	}
 
-	return seq
+	return append(visitFirst, visitSecond...)
 }
 
 func moveToVector(move byte) []int {
