@@ -2,12 +2,58 @@ package day_21
 
 import (
 	"fmt"
+	"math"
+	"os"
+	"strconv"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 type Pad struct {
 	ButtonCoords map[byte][]int
 	Gap          []int
+	Pad          [][]byte
+}
+
+type Button struct {
+	Text   string
+	Coords []int
+}
+
+func resetCursor() {
+	fmt.Print("\033[2K\r")
+}
+
+func clearConsole() {
+	fmt.Print("\033[H\033[2J")
+}
+
+func (pad *Pad) print(activeKey byte) {
+	height := len(pad.Pad)
+	width := len(pad.Pad[0])
+
+	for y := 0; y < height; y++ {
+		fmt.Printf("%s+\n", strings.Repeat("+---", width))
+		resetCursor()
+
+		row := ""
+		for x := 0; x < width; x++ {
+			button := pad.Pad[y][x]
+
+			if button == activeKey {
+				row = fmt.Sprintf("%s| %s%c%s ", row, red, button, reset)
+
+			} else {
+				row = fmt.Sprintf("%s| %c ", row, button)
+			}
+		}
+		fmt.Printf("%s|\n", row)
+		resetCursor()
+	}
+
+	fmt.Printf("%s+\n", strings.Repeat("+---", width))
+	resetCursor()
 }
 
 func (pad *Pad) shortestPath(a byte, b byte) []byte {
@@ -20,34 +66,138 @@ func (pad *Pad) shortestPath(a byte, b byte) []byte {
 		return []byte{}
 	}
 
+	if a == b {
+		return []byte{}
+	}
+
 	diffX := bCoords[0] - aCoords[0]
 	diffY := bCoords[1] - aCoords[1]
+	// fmt.Printf("%c: %v -> %c: %v; Diff: %d, %d\n", a, aCoords, b, bCoords, diffX, diffY)
+	diffXAbs := int(math.Abs(float64(diffX)))
+	diffYAbs := int(math.Abs(float64(diffY)))
 
-	var horizontalMove string
-	var veritcalMove string
-
-	if diffX > 0 {
-		horizontalMove = strings.Repeat(">", diffX)
-	} else {
-		horizontalMove = strings.Repeat("<", diffX)
+	if diffX == 0 || diffY == 0 {
+		if diffX > 0 {
+			return []byte(strings.Repeat(">", diffXAbs))
+		} else if diffX < 0 {
+			return []byte(strings.Repeat("<", diffXAbs))
+		} else if diffY > 0 {
+			return []byte(strings.Repeat("v", diffYAbs))
+		} else {
+			return []byte(strings.Repeat("^", diffYAbs))
+		}
 	}
 
+	horizontalMove := ">"
+	if diffX < 0 {
+		horizontalMove = "<"
+	}
+	veritcalMove := "^"
 	if diffY > 0 {
-		veritcalMove = strings.Repeat("v", diffY)
-	} else {
-		veritcalMove = strings.Repeat("^", diffY)
+		veritcalMove = "v"
 	}
 
-	if aCoords[0]+diffX != pad.Gap[0] || aCoords[1] != pad.Gap[1] {
-		// Safe to move horizontally first
-		moveStr := fmt.Sprintf("%s%s", horizontalMove, veritcalMove)
-		return []byte(moveStr)
+	horizontalSequence := []byte(strings.Repeat(horizontalMove, diffXAbs))
+	verticalSequence := []byte(strings.Repeat(veritcalMove, diffYAbs))
 
+	seq := make([]byte, 0, len(horizontalSequence)+len(verticalSequence))
+	if horizontalMove == "<" {
+		if pad.Gap[1] == aCoords[1] && pad.Gap[0] < aCoords[0] && pad.Gap[0] >= aCoords[0]-diffXAbs {
+			// Will hit it horizontally
+			seq = append(seq, verticalSequence...)
+			seq = append(seq, horizontalSequence...)
+		} else {
+			seq = append(seq, horizontalSequence...)
+			seq = append(seq, verticalSequence...)
+		}
+	} else if veritcalMove == "v" {
+		if pad.Gap[0] == aCoords[0] && pad.Gap[1] > aCoords[1] && pad.Gap[1] <= aCoords[1]+diffYAbs {
+			// will hit it vertically
+			seq = append(seq, horizontalSequence...)
+			seq = append(seq, verticalSequence...)
+		} else {
+			seq = append(seq, verticalSequence...)
+			seq = append(seq, horizontalSequence...)
+		}
 	} else {
-		// Safe to move vertically first
-		moveStr := fmt.Sprintf("%s%s", veritcalMove, horizontalMove)
-		return []byte(moveStr)
+		if pad.Gap[0] == aCoords[0] && pad.Gap[1] > aCoords[1] && pad.Gap[1] <= aCoords[1]+diffYAbs {
+			// will hit it vertically
+			seq = append(seq, horizontalSequence...)
+			seq = append(seq, verticalSequence...)
+		} else {
+			seq = append(seq, verticalSequence...)
+			seq = append(seq, horizontalSequence...)
+		}
 	}
+
+	return seq
+}
+
+func moveToVector(move byte) []int {
+	switch move {
+	case '<':
+		return []int{-1, 0}
+	case '>':
+		return []int{1, 0}
+	case '^':
+		return []int{0, -1}
+	case 'v':
+		return []int{0, 1}
+	default:
+		return []int{0, 0}
+	}
+}
+
+func addVectors(a []int, b []int) []int {
+	return []int{a[0] + b[0], a[1] + b[1]}
+}
+
+type RobotState struct {
+	RobotPad  *Pad
+	Pointer   byte
+	NextRobot *RobotState
+}
+
+func (rs *RobotState) movePointer(move byte) {
+	nextPointer, err := rs.RobotPad.nextKey(rs.Pointer, move)
+	resetCursor()
+	if err == nil {
+		rs.Pointer = nextPointer
+	}
+}
+
+func (rs *RobotState) pressButton() {
+	if rs.NextRobot != nil {
+		if rs.Pointer == 'A' {
+			rs.NextRobot.pressButton()
+		} else {
+			rs.NextRobot.movePointer(rs.Pointer)
+		}
+	} else {
+		fmt.Printf("%c\n", rs.Pointer)
+	}
+}
+
+const red = "\033[31m"
+const green = "\033[32m"
+const reset = "\033[0m"
+
+func (pad *Pad) nextKey(currentPointer byte, move byte) (byte, error) {
+	currentCoords, hasButton := pad.ButtonCoords[currentPointer]
+	if !hasButton {
+		return 0, fmt.Errorf("Out of bounds")
+	}
+	newCoords := addVectors(currentCoords, moveToVector(move))
+	// fmt.Printf("current: %c, move: %c, coords: %v, vector: %v, new coords: %v\n", currentPointer, move, currentCoords, moveToVector(move), newCoords)
+	resetCursor()
+
+	for button, coords := range pad.ButtonCoords {
+		if coords[0] == newCoords[0] && coords[1] == newCoords[1] {
+			return button, nil
+		}
+	}
+
+	return 0, fmt.Errorf("Invalid coords")
 }
 
 var NumericPad = Pad{
@@ -65,6 +215,12 @@ var NumericPad = Pad{
 		'A': {2, 3},
 	},
 	Gap: []int{0, 3},
+	Pad: [][]byte{
+		{'7', '8', '9'},
+		{'4', '5', '6'},
+		{'1', '2', '3'},
+		{' ', '0', 'A'},
+	},
 }
 
 var DirectionalPad = Pad{
@@ -76,11 +232,151 @@ var DirectionalPad = Pad{
 		'A': {2, 0},
 	},
 	Gap: []int{0, 0},
+	Pad: [][]byte{
+		{' ', '^', 'A'},
+		{'<', 'v', '>'},
+	},
 }
 
-func Part1(input *[]string) (int, error) {
+func translateNumericToDirectional(sequence []byte) []byte {
+	path := make([]byte, 0)
+	current := 'A'
 
-	return -1, fmt.Errorf("not implemented")
+	for _, b := range sequence {
+		pathToButton := NumericPad.shortestPath(byte(current), b)
+		path = append(path, pathToButton...)
+		path = append(path, 'A')
+		current = rune(b)
+	}
+
+	return path
+}
+
+func translateDirectionalToDirectional(sequence []byte) []byte {
+	path := make([]byte, 0)
+	current := 'A'
+
+	for _, b := range sequence {
+		pathToButton := DirectionalPad.shortestPath(byte(current), b)
+		path = append(path, pathToButton...)
+		path = append(path, 'A')
+		current = rune(b)
+	}
+
+	return path
+}
+
+func runSimulation() {
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		panic(err)
+	}
+	defer term.Restore(int(os.Stdin.Fd()), oldState)
+
+	numPadRobot := RobotState{
+		NextRobot: nil,
+		Pointer:   'A',
+		RobotPad:  &NumericPad,
+	}
+
+	firstDirPadRobot := RobotState{
+		NextRobot: &numPadRobot,
+		Pointer:   'A',
+		RobotPad:  &DirectionalPad,
+	}
+
+	secondDirPadRobot := RobotState{
+		NextRobot: &firstDirPadRobot,
+		Pointer:   'A',
+		RobotPad:  &DirectionalPad,
+	}
+
+	// Read a single byte
+	buf := make([]byte, 3) // Arrow keys send a sequence of 3 bytes
+
+	for {
+
+		clearConsole()
+		resetCursor()
+		secondDirPadRobot.RobotPad.print(secondDirPadRobot.Pointer)
+		resetCursor()
+		fmt.Println("")
+		resetCursor()
+		firstDirPadRobot.RobotPad.print(firstDirPadRobot.Pointer)
+		resetCursor()
+		fmt.Println("")
+		resetCursor()
+		numPadRobot.RobotPad.print(numPadRobot.Pointer)
+		resetCursor()
+		fmt.Println("")
+		resetCursor()
+
+		n, err := os.Stdin.Read(buf)
+		if err != nil {
+			panic(err)
+		}
+
+		// Interpret the byte sequence
+		if n == 1 && buf[0] == 27 { // ESC key
+			resetCursor()
+			fmt.Println("ESC pressed. Exiting...")
+			resetCursor()
+			break
+		} else if n == 3 && buf[0] == 27 && buf[1] == 91 { // Arrow keys
+			switch buf[2] {
+			case 65:
+				// Up arrow pressed
+				secondDirPadRobot.movePointer('^')
+			case 66:
+				// Down arrow pressed
+				secondDirPadRobot.movePointer('v')
+			case 67:
+				// Right arrow pressed
+				secondDirPadRobot.movePointer('>')
+			case 68:
+				// Left arrow pressed
+				secondDirPadRobot.movePointer('<')
+			}
+		} else if n == 1 && (buf[0] == 'A' || buf[0] == 'a') { // A key
+			secondDirPadRobot.pressButton()
+		}
+		resetCursor()
+		fmt.Println("-----------------------")
+		resetCursor()
+	}
+
+}
+func Part1(input *[]string) (int, error) {
+	// runSimulation()
+	// return 0, nil
+	sumOfComplexities := 0
+
+	NumericPad.print('A')
+	DirectionalPad.print('A')
+
+	for _, sequence := range *input {
+		numPart := sequence[0 : len(sequence)-1]
+		num, err := strconv.Atoi(numPart)
+		if err != nil {
+			return -1, err
+		}
+
+		fmt.Printf("Sequence: %s\n", sequence)
+
+		level1Seq := translateNumericToDirectional([]byte(sequence))
+		level2Seq := translateDirectionalToDirectional(level1Seq)
+		level3Seq := translateDirectionalToDirectional(level2Seq)
+
+		fmt.Printf("%s: %s\n", sequence, string(level3Seq))
+		fmt.Printf("%s: %s\n", sequence, string(level2Seq))
+		fmt.Printf("%s: %s\n", sequence, string(level1Seq))
+
+		complexity := num * len(level3Seq)
+		fmt.Printf("%s: %d * %d = %d\n", sequence, num, len(level3Seq), complexity)
+		sumOfComplexities += complexity
+	}
+
+	return sumOfComplexities, nil
 }
 
 func Part2(input *[]string) (int, error) {
